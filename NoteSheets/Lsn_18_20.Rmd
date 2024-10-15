@@ -1,0 +1,228 @@
+---
+title: "Lesson 18 (Actually Lesson 20...)"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Let's consider data from a clinical trial of 59 epileptics. For a baseline, patience were observed for 8 weeks and the number of seizures were recorded. The patience were then randomized to treatment by the drug Progabide (31 patients) or to the placebo group (28 patience). They were then observed for four 2-week periods with the number of seizures recorded.
+
+What are our observational units and what are our experimental units here?
+
+\vspace{1.in}
+
+```{r,warning=FALSE,message=FALSE}
+library(faraway)
+library(tidyverse)
+
+data("epilepsy")
+epilepsy$period <- rep(0:4, 59) # Time period observed
+epilepsy$drug <- factor(c("placebo","treatment")[epilepsy$treat+1])
+epilepsy$phase <- factor(c("baseline", "experiment")[epilepsy$expind+1])
+epilepsy %>% head(2)
+
+```
+
+Now, Faraway does the following:
+
+```{r}
+ratesum <- epilepsy %>%
+  group_by(id, phase, drug) %>%
+  summarise(rate=mean(seizures/timeadj))
+comsum <- spread(ratesum, phase, rate)
+#ggplot(comsum, aes(x=baseline, y=experiment, shape=drug)) + geom_point() + 
+#  scale_x_sqrt() + scale_y_sqrt() + geom_abline(intercept=0, slope=1)+ 
+#  theme(legend.position = "top", legend.direction = "horizontal")
+
+
+```
+
+and decides to exclude the upper right point from the analysis. Do you concur with this decision?
+
+\vspace{1.in}
+
+He next fits the data to a Poisson GLM. Let's write out the model and consider what it means:
+
+\vspace{1.in}
+
+Instead, let's consider the uniqueness of each individual in the study. Perhaps we want to consider a mixed model. Now, one option is to assume that that the mechanism of interest varies according to a gamma distribution. That is, we could do:
+
+\vspace{2.in}
+
+Now, if we want to maximize the likelihood we could write the likelihood for a single observation as:
+
+\vspace{2.in}
+
+In this case, we can think of $\lambda$ as a nuisance that we need to get rid of. Recall, that the information we really want is contained within the expected value of the Gamma distribution. Currently, our likelihood is a function of $\lambda$, $\mu$, and $k$. So, to get rid of $\lambda$ we can integrate it out. That is we can do:
+
+\vspace{2.in}
+
+Unfortunately, having $\lambda$ come from a Gamma distribution isn't the most natural way for us to think about the model. If we want to keep the same structure as our linear mixed effects models we could write:
+
+\vspace{3.in}
+
+Now, our likelihood could be written as:
+
+\vspace{2.in}
+
+And now, unfortunately, we have a problem. If our distribution of our data are normal and the distribution of our random effects are normal we can integrate out our random effects. If not, oftentimes this integral is not solvable through conventional methods. In fact, this can be quite difficult to do if our random effects become more complicated. However, all is not lost. What we will consider today is numerically approximating our integral. 
+
+Now, as it turns out, if our random effects are normally distributed, our integral is of the form
+
+$$ \int_{-\infty}^{\infty} h(u) \exp(-u^2) du \approx \sum_{k=1}^q c_k h(s_k)$$
+
+Integrals of this form can be approximated by finding weights and quadrature points $c_k$ and $s_k$ For more see, eg. \url{https://en.wikipedia.org/wiki/Gaussian_quadrature}.  The point here here is we can then approximate the integral and then maximize the likelihood (again this is done numerically). As our number of quadrature points $q$ increase, our approximation to the integral gets better. We can start with a single quadrature point, which is called Laplace approximation. 
+
+We can do this in R with:
+
+```{r,warning=FALSE,message=FALSE}
+library(lme4)
+
+model1 <- glmer(seizures~offset(log(timeadj))+phase*drug +
+                  (1|id), nAGQ = 1, family=poisson,
+                data=epilepsy)
+
+summary(model1)
+
+```
+
+To get a more exact approximation, we can increase the number of quadrature points:
+
+```{r}
+
+model2 <- glmer(seizures~offset(log(timeadj))+phase*drug +
+                  (1|id), nAGQ = 25, family=poisson,
+                data=epilepsy)
+
+summary(model2)
+
+```
+
+
+Let's compare how quickly these execute:
+
+```{r}
+start_time <- Sys.time()
+model1 <- glmer(seizures~offset(log(timeadj))+phase*drug +
+                  (1|id), nAGQ = 1, family=poisson,
+                data=epilepsy)
+end_time <- Sys.time()
+end_time - start_time
+
+
+start_time <- Sys.time()
+model2 <- glmer(seizures~offset(log(timeadj))+phase*drug +
+                  (1|id), nAGQ = 25, family=poisson,
+                data=epilepsy)
+end_time <- Sys.time()
+end_time - start_time
+
+```
+
+Not a huge problem here, but as our number of random effects increase, we may start to run into issues. 
+
+Note here that we can't compare model 1 to model 2 using AIC or anything else because they're the same model, just fit two different ways.
+
+Let's look at the Poisson GLMM a bit more. Assuming we have a single random effect we can write:
+
+\vspace{.5in}
+
+We can use this to find $E[y_{ij}]$ by finding:
+
+\vspace{.5in}
+
+The Variance of $y_{ij}$ in turn is:
+
+\vspace{1.in}
+
+If we want to look at the correlation between two observations within the same cluster, we have to do a bit more work than the Normal case where the covariance is just $\sigma^2_u$. Here it becomes:
+
+$$\exp[(x_{ij}+x_{ik})\beta][\exp(2\sigma^2_u)-\exp(\sigma^2_u)]$$
+From here it's straight forward to find the correlation between two observations. The key takeaway, though, is that the correlation between two observations within a single cluster \textit{must} be positive. We cannot use a Poisson GLMM to model negatively correlated data. Is this significant? Well, maybe, maybe not. Typically we think about data that is clustered together to be more similar, so positively correlated, but it is something to keep in mind.
+
+Let's look at another GLMM, a GLMM for binary responses. From Faraway, an experiment was conducted to study the effects of  surface and vision on balance. The balance of subjects was observed for two different surfaces and for restricted and unrestricted vision. Balance was assessed qualitatively on an ordinal four-point scale (which we will turn into a two point scale). The subjects were tested while standing on foam or a normal surface and with their eyes closed or open or with a dome placed over their head. Each subject was tested twice in each of the surface and eye combinations.
+
+Observational units? Experimental units?
+
+\vspace{1.5in}
+
+```{r}
+data(ctsib)
+ctsib$stable <- ifelse(ctsib$CTSIB==1,1,0)
+ctsib %>% head(4)
+```
+
+Let's try the MA376 approach:
+
+```{r}
+ctsib_glm <- glm(stable~Sex+Age+Height+Weight+
+                   Surface+Vision+
+                   factor(Subject),
+                 family="binomial",
+                 data=ctsib)
+
+```
+
+Our model is overspecified. We cannot estimate everything we might want to. 
+
+Should we remove Subject?
+
+```{r}
+ctsib_test <- glm(stable~as.factor(Subject),family=binomial,data=ctsib)
+anova(ctsib_test,test="Chisq")
+
+```
+
+What does this show?
+
+\vspace{1.5in}
+
+Here, perhaps, we want to consider a subject effect as a random effect. Or, in other words, we want to fit the model:
+
+\vspace{2.in}
+
+
+Which we do by:
+
+```{r}
+library(lme4)
+ctsib_glmm <- glmer(stable~Sex + Age + Height +
+                      Weight + Surface + Vision +
+                      (1|Subject),nAGQ=25,
+                    family=binomial,
+                    data=ctsib)
+
+
+```
+
+And herein we see an issue. If we look at Faraway's book it looks like everything is fine. However, clearly the `lme4` package has changed since publication and it's now giving a warning saying the model has failed to converge. Or, in otherwords, we can't really trust the likelihood. If we run into this, we likely need to simplify our model in someway, if instead we run a simpler model we are able to converge:
+
+```{r}
+ctsib_glmm2 <- glmer(stable~Surface + Vision +
+                      (1|Subject),nAGQ=25,
+                    family=binomial,
+                    data=ctsib)
+
+summary(ctsib_glmm2)
+
+```
+
+Let's go through the output.
+
+
+Now, we haven't really talked about how do we assess whether our model is good. We can extracte residuals and fitted values through (note the difference from Faraway page 281):
+
+```{r,warning=FALSE,message=FALSE}
+library(boot)
+dd <- fortify.merMod(ctsib_glmm2)
+
+phat <- inv.logit(dd$.fitted)
+
+#plot(phat,ctsib$stable)
+
+```
+
+Let's say you want to model correlated responses differently within clusters. For example, let's say you have count data that you think has an AR(1) type relationship. For our linear model this was easy. For a non-Normal response, as best I know, you have to use Bayesian methods that we will discuss next class.

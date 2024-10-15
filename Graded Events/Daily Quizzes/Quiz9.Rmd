@@ -1,0 +1,13 @@
+---
+title: "Quiz9- MA478"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Consider the data from my previous semester teaching MA206. Is there evidence that Cadets in my H Hour respond differently to the question "Did this Course Help my Creativity" than my I Hour?
+
+Present your fitted model along with 95\% confidence interval for the odds ratio between my two sections. Is there a difference between the two sections? Provide the statistic you used to answer the question, and how you arrived at your conclusion?

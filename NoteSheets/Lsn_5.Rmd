@@ -1,0 +1,130 @@
+---
+title: "MA478 - Lesson 5"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Today we're going to talk about fitting GLMs. That is, finding $\beta$ values that best project some function of our mean onto the column space of our design matrix.
+
+To get there, I first want to backtrack just a little and talk about weighted least squares. If we recall, we could rewrite our linear regression model as:
+
+\vspace{.5in}
+
+A more general structure would be to allow $Cov(y)=\sigma^2 \textbf{V}$. If we KNOW $\textbf{V}$, then we could use this to rewrite $X$ and $y$ as:
+
+\vspace{.5in}
+
+The reason for this, is now the relationship between $\textbf{X*}$ and $\textbf{y*}$ follows our typical assumptions for linear regression. That is we have:
+
+\vspace{.5in}
+
+Therefore, we can find the least squares estimates of $\beta$ as:
+
+\vspace{1.in}
+
+Our estimate of $\beta$ is sometimes called the GLS estimate, or the \textit{generalized least squares} estimate of $\beta$. If we assume that $\textbf{V}$ is diagonal $var(y_i)=\frac{\sigma^2}{w_i}$, our estimates of $\beta$ give more weight to some observations than to others, then we call the estimates the weighted least squares estimator. 
+
+## From Fitting LMs to Fitting GLMs
+
+Unfortunately unlike fitting a linear model, we can't directly minimize the SSE. Most often in order to estimate $\beta$ we have to rely on maximum likelihood estimation. Just as a quick aside, in case you haven't had MA476, MLEs are found in the following way:
+
+\vspace{1.5in}
+
+Therefore, most often we don't want to maximize the likelihood, instead we want to maximize the log likelihood. For a single observation from a GLM (note this is true for ANY GLM) we can write:
+
+\vspace{2.in}
+
+Now note that we want to maximize this for $\beta$ but there aren't any $\beta$ terms! So, we have to have our cascading functions:
+
+\vspace{2.in}
+
+So, to take the derivative of a function inside of a function (inside of a function, inside of a function) we have to rely on our old friend the chain rule.
+
+\vspace{2.in}
+
+For what seems like no reason, we're going to rewrite this in the following way:
+
+\vspace{2.in}
+
+If, instead, we had started out with the weighted least squares criterion:
+
+\vspace{1.in}
+
+and we attempted to minimize it (WRT $\beta$) then we ALSO would have ended up with the same thing!
+
+This suggests (and I'm skipping a TON of steps here that Agresti goes through but I don't think they're helpful at this stage) that we can find estimates of $\beta$ by minimizing a weighted least squares type equation. The complete algorithm is:
+
+\vspace{1.5in}
+
+So, we need to know $\eta=g(\mu)$ and $V(\mu)$, but we really don't need any further information about the distribution of $\textbf{y}$ other than the fact that it is part of the exponential dispersion family.
+
+Let's put this all together for a model where we assume a Poisson distribution with a log link.
+
+\vspace{2.in}
+
+
+```{r}
+# Example: this data set gives the number of warp breaks per loom, where a loom 
+# corresponds to a fixed length of yarn.
+library(faraway)
+X <- model.matrix(~wool*tension,
+                  data=warpbreaks) # wool, tension and interaction variables
+y <- warpbreaks$breaks # the number of breaks (count response)
+
+
+mu <- y
+eta <- log(mu)
+z <- eta + (y-mu)/mu
+w <- mu
+lmod <- lm(z~wool*tension,weights=w,warpbreaks)
+coef(lmod)
+
+
+for(i in 1:5){
+  eta <- lmod$fitted.values
+  mu <- exp(eta)
+  z <- eta + (y-mu)/mu
+  w <- mu
+  lmod <- lm(z~wool*tension,weights=w,warpbreaks)
+  cat(i, coef(lmod), "\n")
+}
+
+
+
+
+```
+
+Now, the one thing this doesn't give us is the standard error of $\boldsymbol{\beta}$.
+
+To solve for this we note that we can estimate the variance through:
+
+\vspace{1.in}
+
+For a Poisson regression, $\phi=1$ so all we need are the weights from above.
+
+
+```{r}
+wm <- diag(w)
+sqrt(diag(solve(t(X)%*%wm%*%X)))
+
+
+```
+
+Which we can compare to:
+
+```{r}
+r_glm = glm(breaks~wool*tension,data=warpbreaks,
+            family=poisson(link="log"))
+
+summary(r_glm)
+
+
+```
+
+Let's say, instead, we wanted to use the Gamma distribution for $Y$. How does this differ? What would we have to change in our setup? What choices do we have to make?
+
+

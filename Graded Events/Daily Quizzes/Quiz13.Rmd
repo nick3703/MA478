@@ -1,0 +1,22 @@
+---
+title: "Quiz13- MA478"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Consider the Chicago burglary dataset available at:
+
+
+```{r}
+library(tidyverse)
+
+Chi_dat <- read.csv("https://raw.githubusercontent.com/nick3703/Chicago-Data/master/crime.csv")
+
+```
+
+
+Sum the data over all spatial locations so you have a single observation for each month. Fit an intercept only model to this dataset with an independent error structure, a compound symmetry error, and an AR(1) error structure.  Write out the most appropriate model and provide parameter estimates.

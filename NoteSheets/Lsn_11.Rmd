@@ -1,0 +1,225 @@
+---
+title: "Lesson 11"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Today we're going to talk about two types of models, one that I don't think gets used a lot, and another that \textit{should} be used a lot, but most people don't know about.
+
+The first question we're going to analyze is whether we can determine an individual's political party (Democrat, Republican, or Independent) based on age, education, and income. (Before anyone jumps down my throat here, this is from 1996, so take all of these findings with a grain of salt...)
+
+Our response variable is \textbf{political party}. Let's consider our response variable $y_i$, what are some values that it can take on? How would we represent it in a statistical model?
+
+\vspace{1.in}
+
+If we take a sample from the population, the number of each political party that we observe would follow a \textbf{multinomial distribution}.
+
+\vspace{1.5in}
+
+If we only had two political parties, let's see what would happen to the multinomial.
+
+\vspace{.5in}
+
+So, essentially we are generalizing the binomial distribution. Now, let's say we want to analyze the probabilities, that is, we want to put structure on the probability that someone from our sample came from each of the parties. Note that if we weren't interested in this we could easily come up with the $\pi$ values through descriptive analytics.
+
+```{r,warning=FALSE,message=FALSE}
+library(faraway)
+library(tidyverse)
+pol_dat <- read.csv("PoliticalPartyData.csv")
+
+pol_dat %>% 
+  group_by(PolParty) %>%
+  summarize(pi_hat = n()/nrow(pol_dat))
+```
+
+However, since we're statisticians, we think we can likely do better than this. In fact, what we just found is the null model for a multinomial logit model. 
+
+This model is sometimes called the baseline-category logit model. Here, we assume that our data follow a multinomial probability distribution. It seems like to do this we could just write out (ignoring the constants)
+
+\vspace{1.5in}
+
+However, we have an issue, even though it looks like I have three $\pi$ values, I actually only have two. Why?
+
+\vspace{1.in}
+
+Now, really, we're sort of in the same world we were when we developed out the Binomial exponential dispersion family. To account for this, we can do:
+
+\vspace{1.in}
+
+So, our natural parameter (which is now a vector) that we will put structure on is:
+
+\vspace{1.in}
+
+This whole notion of choosing a baseline category may seem rather arbitrary. But really, it's no less arbitrary than in logistic regression when we choose one of our outcomes to be a ``success'' and another to be a ``failure''.  
+
+So, our entire model is:
+
+\vspace{1.5in}
+
+Which we can fit in R
+
+```{r,warning=FALSE,message=FALSE}
+library(nnet)
+mmod <- multinom(PolParty ~ Race + Gender +Age + HighestDegree,
+                 data=pol_dat)
+
+summary(mmod)
+```
+
+We can analyze the impact of education through a likelihood ratio test (drop in deviance test) as our model is fit via MLE and therefore our coefficients are asymptotically normal
+
+```{r}
+mod2 <- multinom(PolParty ~ Race + Gender +Age,
+                 data=pol_dat)
+
+anova(mmod,mod2,test="Chisq")
+```
+
+Now, perhaps this is a little surprising that there is a diffence of 8 degrees in freedom when we remove education since:
+
+```{r}
+unique(pol_dat$HighestDegree)
+
+```
+
+What do you think is going on?
+
+\vspace{.5in}
+
+Assessing the model is not, to me, entirely straightforward. If our data were grouped, we could compare our deviance to saturated model, but since it's not, I'm not entire sure.
+
+We can find residuals through:
+
+```{r}
+resids <- residuals(mmod,type="response")
+
+```
+These can then be plotted against explanatory variables or linear predictors.
+
+The real \textit{fun} though is interpreting the coefficients. Going back to the summary output, we have the following fitted models.
+
+\vspace{2.in}
+
+Let's just focus on Age for a second. If we examine the confidence intervals we get (using Wald interval)
+
+```{r}
+-.01673-1.96*0.0009145936
+-.01673+1.96*0.0009145936
+```
+
+So, comparing independents to democrats, we note that an approximate odds ratio is:
+
+```{r}
+exp(-.01673-1.96*0.0009145936)
+exp(-.01673+1.96*0.0009145936)
+
+```
+
+Meaning, for every year older the odds that you are an independent over a democrat decrease by a rate of about 98\%.
+
+We can do the same thing comparing republicans to democrats
+
+
+```{r}
+-0.001706418-1.96*0.0010280506
+-0.001706418+1.96*0.0010280506
+
+```
+
+Here we see no effect as the CI contains 0.
+
+What if we want to compare republicans to independents? Well, then we have to do some work:
+
+\vspace{1.in}
+
+So, we want the distribution of $\beta_{r,age} - \beta_{i,age}$. However, we note to find this we have:
+
+\vspace{1.in}
+
+This requires us to look at the covariance matrix. 
+
+```{r}
+
+#vcov(mmod)
+se <- sqrt(0.0010280506^2+0.0009145936^2-2*4.749699e-07)
+
+#Difference in betas minus new se 
+exp(((-0.001706418)-(-.01673))-1.96*se)
+exp(((-0.001706418)-(-.01673))+1.96*se)
+
+```
+
+One other type of model I want to talk about that I think should be used more. In fact, Cadets deal with data like this all the time. That is, ordinal data.
+
+If we've ever taken a survey where the possible responses are strongly disagree, disagree, neutral, agree, strongly agree, we have deal with ordinal data. 
+
+Here our data differ from what we talked about above in that there is a natural ordering of the data. In this case, we want to express the model in terms of cumulative probabilities.
+
+Cumulative logits can be constructed by thinking about the data like every category above the one we are looking at is a failure and every category below the one we're looking at is a success.
+
+That is:
+
+\vspace{1.in}
+
+So, for the cumulative logit model, we place structure on the cumulative logit.
+
+\vspace{.5in}
+
+Note that the underlying statistical model is still a multinomial, but we are, sort of, changing our link function. Note that each logit has its own intercept. The intercept values \textit{must} increase, why?
+
+\vspace{.5in}
+
+```{r}
+
+mental_health <- read.table('https://users.stat.ufl.edu/~aa/glm/data/Mental.dat', header=TRUE)
+
+```
+
+Here, our statistical question is:
+
+\vspace{1.in}
+
+Our model is:
+
+\vspace{1.in}
+
+```{r,warning=FALSE,message=FALSE}
+library(VGAM)
+
+fit.mod <- vglm(impair~life+ses,data=mental_health,
+                family=cumulative(parallel=TRUE))
+
+```
+
+Note there are a couple of things to address here. One is the `parallel=TRUE`. This ensures that you have the same $\beta$ for each of your cut-off values. The `Hauck-Donner` effect is when your data are perfectly separated. When this occurs, you get a ``perfect'' fit, so essentially your $\beta$ terms are not estimable. 
+
+Here we don't have that issue. 
+
+
+
+We can write out three separate fitted models.
+
+\vspace{1.5in}
+
+Additionally, for each individual in our study we can get estimated categories
+
+```{r}
+fitted(fit.mod)%>%head()
+
+```
+
+As we are fitting our model via maximum likelihood we can test nested models via:
+
+```{r}
+smaller.mod <- vglm(impair~life,data=mental_health,
+                family=cumulative(parallel=TRUE))
+chi_stat <- -2*(logLik(smaller.mod)-logLik(fit.mod))
+
+1-pchisq(chi_stat,1)
+
+```
+

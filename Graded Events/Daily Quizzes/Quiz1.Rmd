@@ -1,0 +1,39 @@
+---
+title: "Quiz1"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Problem 1 (3 Pts)
+
+You collect ACFT data on 6 Cadets, 3 firsties and 3 cows, and are interested in determining if there is a difference between the two classes so you build out the following linear regression model:
+
+\begin{align*}
+i & =\mbox{Cadet (1,...,6)}\\ 
+x_i &= \mbox{1 if cow, 0 if firstie}\\
+y_i &= \mbox{ACFT Score for Cadet }i\\
+y_i &= \beta_0 + \beta_1 x_i + \epsilon_i\\
+\epsilon_i &\sim N(0,\sigma)
+\end{align*}
+
+Write out the design (model) matrix $\boldsymbol{X}$ associated with this linear regression. Assume that Cadets 1-3 are Cows and Cadets 4-6 are Firsties.
+
+
+\newpage
+
+## Problem 2 (2 pts)
+
+Write out the Projection matrix associated with $\boldsymbol{X}$. 
+
+
+## Extra Credit (2 pts)
+
+Give another model matrix that you could have used that has the same column space as $\boldsymbol{X}$. Write out the linear regression model associated with this model matrix.
+
+
+
+

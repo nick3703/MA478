@@ -1,0 +1,194 @@
+---
+title: "Lesson 14"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Recall that a Poisson distribution is a limiting case of the Binomial. That is, we would want to use a Poisson when $n$ (or the number of trials, and we use this term really loosely here) is really large and the probability of success is really small. Typically, in practice a Poisson is used for count data and is the default choice due to its simplicity in formulation and interpretation.
+
+However, we did notice an issue with the Poisson, if you recall, last class we attempted to fit data from the Galapagos Islands using a Poisson GLM and we had some issues
+
+```{r,warning=FALSE,message=FALSE}
+library(faraway)
+library(tidyverse)
+data(gala)
+gala_df <- gala %>%
+  select(-Endemics)
+
+
+gala_glm <- glm(Species ~ Scruz + 
+                Elevation, data=gala_df,
+                family=poisson)
+
+1-pchisq(deviance(gala_glm),df.residual(gala_glm))
+deviance(gala_glm) / df.residual(gala_glm)
+
+
+```
+
+One of the reasons that we may have a poor fit is due to \textit{over dispersion}, that is, if we recall we had one serious limitation of a Poisson:
+
+\vspace{.5in}
+
+Now, to motivate this next type of model, I first want to introduce the idea of a hierarchical, or mixture, model. Let's consider the following situation, let's say I am interested in determining whether crime or weather impacts the number of people that show up for voting and I collect data across a wide range of counties in American for a wide range of days. Perhaps my model becomes:
+
+\vspace{1.5in}
+
+However, there are undoubtedly some unique characteristics of a county that cause some counties to have higher or lower voting turnout that aren't accounted for in the covariates. We can think of this as our mechanism of interest ($\log(\lambda)$) manifests itself differently for different situations. We write:
+
+\vspace{1.5in}
+
+Now, the field of mixture models is a subject in of itself, so today we're only going to talk about one specific mixture model and in later classes we will have a more general discussion about the role  mixture models play in GLMs.
+
+For now, we will assume that $g(\lambda|\mu,\kappa)$ follows a Gamma distribution. That is we can write a joint distribution for $h(Y,\lambda)$ as:
+
+\vspace{2.in}
+
+However, we don't every observe $\lambda$ so we need to marginalize over $\lambda$ to get a distribution just for $Y$. That is, we must calculate:
+
+\vspace{1.5in}
+
+Once we do this, we now have $f(Y|\mu,\kappa)$, which it turns out is the density of a Negative Binomial distribution.
+
+\vspace{1.5in}
+
+So, the key here is, when we are using a negative binomial, we are assuming that our mechanism of interest (the expected count) varies according to a Gamma distribution. The second order effect is we can calculate the expected value and the variance of this new distribution:
+
+\vspace{1.in}
+
+And, as it turns out, for a fixed value of $\kappa$ we can write the negative binomial in exponential dispersion family form with a canonical parameter of $\frac{\mu}{\mu+\kappa}$, however most of the time negative binomial GLMs use the log link. Now, since a NB GLM isn't technically a member of the exponential dispersion family, we have to use a different function in R to fit the models, we can use `library(MASS)` which should come standard in R (meaning you don't need to install it.)
+
+We can do:
+
+```{r}
+library(MASS)
+gala_glm2<-glm.nb(Species~ Scruz +
+                Elevation,data=gala_df)
+
+summary(gala_glm2)
+
+logLik(gala_glm2)
+logLik(gala_glm) #We have to be careful here
+
+```
+
+
+
+
+Now, unfortunately because we're estimating $\kappa$ we cannot use our deviance to conduct a goodness of fit. We could use AIC, but to me it's really obvious the negative binomial fits better:
+
+\vspace{2.in}
+
+What's the implications of using the wrong model?
+
+```{r}
+#Profile CIs
+
+confint(gala_glm)
+confint(gala_glm2)
+
+```
+
+Another type of mixture model that gets used a bit is what's called a zero-inflated Poisson or ZIP model. These get used when the number of zeros in our data set is greater than what is to be expected under a Poisson. To view my motivation for teaching you, I'm going to quote from a 600 level Stats course I took at Iowa State from Prof Mark Kaiser:
+
+What are known as zero-inflated models have applications in situations for which one might naturally consider using a binomial or a Poisson model, but in which the observed frequency of zeros in data are in excess of what would reasonably be expected in a model with positive mean and the specified distribution. Some statisticians are perfectly happy to simply specify a data model with an inflated probability of zero in such cases, just as they are to use a gamma-Poisson mixture and call it a negative binomial distribution. I greatly prefer if a \textit{reasonable conceptualization is available that can represent a mechanism that could lead to increased frequency of zero values}, just as I prefer a gamma-Poisson to be thought of as a hierarchical model in which the relative frequencies with which a mechanism manifests itself are reflected in the gamma mixing distribution.
+
+To me, this means, think about the situation you are modeling and if you can conceive of two different processes (one that makes zeros and one that makes a Poisson) use a ZIP model.
+
+A ZIP model is structured as a two component mixture
+
+
+\vspace{1.in}
+
+We can then parameterize  the mixing probability $\phi_i$ and/or $\log(\lambda_i)$. Let's give an example motivated from a study done by Royle and Dorazio (2008). Here they wanted to determine the number of weasels that lived in a variety of of sampling locations. They visited 464 locations and collected data that looked like:
+
+```{r}
+
+weasels <- data.frame(observed=c(rep(0,400),rep(1,16),rep(2,12),rep(3,12),rep(4,5),
+             rep(5,10),rep(6,3),rep(7,4),rep(8,2)))
+
+weasels %>% ggplot(aes(x=observed))+
+  geom_histogram()
+
+```
+
+
+We could fit this with a Poisson
+
+```{r}
+
+pois<-glm(observed~1,data=weasels,family=poisson)
+1-pchisq(902,df.residual(pois))
+
+```
+
+Clearly doesn't fit well and, under this model, the probability of observing a zero is:
+
+```{r}
+
+dpois(0,exp(-.8023))
+
+```
+
+Meaning, we would expect to have observed $.64(464) = 300$ zeros instead of the $400$ we observed. So, let's think about the problem. If we go into an area and we observe zero Weasels what might have happened?
+
+\vspace{1.in}
+
+So, maybe there's two different mechanisms we have to consider. 
+
+```{r,warning=FALSE,message=FALSE}
+library(pscl)
+zip_glm <- zeroinfl(observed~1,data=weasels,family="poisson")
+summary(zip_glm)
+
+```
+
+Under this model, the probability of being degeneratively zero is:
+
+```{r}
+exp(1.78)/(1+exp(1.78))
+
+```
+
+And the overall probability of observing a zero is:
+
+\vspace{1.in}
+
+Which we can calculate:
+
+```{r}
+
+Pr0<-0.86+(1-0.86)*dpois(0,exp(1.13))
+
+
+```
+
+Therefore, our expected number of each count is:
+
+```{r}
+counts<-seq(1,8)
+obs<-464
+zip_est<-c(obs*Pr0,obs*dpois(counts,exp(1.13))*(1-0.86))
+pois_est<-obs*dpois(seq(0,8),exp(-.8023))
+actual<-c(400,16,12,12,5,10,3,4,2)
+rbind(pois_est,zip_est,actual)
+
+```
+
+Not a perfect fit:
+
+```{r}
+
+ch_sq <- sum((zip_est-actual)^2/zip_est)
+1-pchisq(ch_sq,8)
+```
+
+But close.
+
+
+So, again, think of a NB GLM as a gamma-Poisson mixture and a ZIP model as a mixture of a bernoulli and a Poisson. While we didn't do so here, we could parameterize either component of a ZIP model. Take a look at the Details of the zeroinfl function. There also are zero inflated negative binomial models, I kind of shrug at those as I have a hard time thinking about what those models mean and I much prefer using a model that I can explain vs a model that might fit the data a little better but I really don't know what the model means.
+

@@ -1,0 +1,132 @@
+---
+title: "Lesson 13"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Today we're going to start talking about models for when our response variable is a count (integer). Recall, if we knew the number of trials and we were modeling the number of successes we could use:
+
+\vspace{1.in}
+
+However, sometimes we are in a different situation. For example, let's say we wanted to build out a model for the number of burglaries that occur in a given city. We \textit{could} consider the number of buildings in the city as the number of trials and define a success if the building had been burgled, however this isn't typically how we would think about the data. To motivate the Poisson distribution (which will be the first GLM response variable we will consider) let's first start with a binomial density and let's assume that $p = \frac{\mu}{n}$. We can write:
+
+\vspace{2.in}
+
+And we see here after we let $n \to \infty$ we have the density function for a Poisson random variable. Therefore, we can think about the Poisson distribution as being the limiting distribution of the binommial when the number of trails increases indefinitely and $\mu$ is the expected value of the number of successes from the trials.
+
+We can also think of $\mu$ as the rate parameter. That is, $\mu$ gives us the expected number of events we would observe in the time period we are conducting our observation.
+
+We can write the Poisson in exponential dispersion family form and we get derive the canonical link
+
+\vspace{1.5in}
+
+From here we see that it is natural to place structure on $\log(\lambda)$. We also see that for a Poisson $\phi=1$ meaning we have a fixed variance to mean ratio. In fact, it is quite fixed. 
+
+\vspace{1.in}
+
+```{r, warning=FALSE,message=FALSE}
+library(faraway)
+library(tidyverse)
+data(gala)
+gala_df <- gala %>%
+  select(-Endemics)
+
+gala_df$Species
+
+```
+
+If we look at building a model for the number of species it really wouldn't make sense to build out a binomial regression model as we don't have an idea of the \textit{number of trials} for each observation. If we did have a column for \textit{possible number of new species} we could use that model, but that doesn't really make sense. While we \textit{could} build out a linear regression model it might not make sense here. Why?
+
+\vspace{.5in}
+
+Let's build out a Poisson regression model using elevation and Scruz as our predictors.
+
+```{r}
+
+pois_glm <- glm(Species ~ Scruz + Elevation, data=gala_df,
+                family=poisson)
+
+summary(pois_glm)
+
+```
+
+Note that since we are using a member of the exponential dispersion family for our response variable we know that our parameters are estimated via maximum likelihood. Therefore, we can conduct our test against the null model examining deviance
+
+```{r}
+
+chi_stat <- 3510-1654
+1-pchisq(chi_stat,2)
+
+```
+
+We can test for the significance of `Scruz` through:
+
+```{r}
+smaller_mod <- glm(Species ~ Elevation, data=gala_df,
+                family=poisson)
+
+anova(smaller_mod,pois_glm,test="Chisq")
+```
+
+and we can conduct a goodness of fit test comparing our model to the saturated model
+```{r}
+1-pchisq(deviance(pois_glm),df.residual(pois_glm))
+
+```
+
+What should we do now?
+
+\vspace{2.in}
+
+```{r}
+halfnorm(residuals(pois_glm))
+```
+
+Nothing jumps out.
+
+```{r}
+plot(log(fitted(pois_glm)),log((gala_df$Species-fitted(pois_glm))^2),
+     xlab=expression(hat(mu)), ylab=expression((y-hat(mu))^2))
+abline(0,1)
+
+```
+
+From here, we see that our variance appears to be bigger than our mean, especially for larger values of $\mu$.
+
+To further see this, we can estimate $\phi$. Remember that by our model we are fixing $\phi$ to be 1
+
+```{r}
+deviance(pois_glm) / df.residual(pois_glm)
+sum(residuals(pois_glm, type = "pearson")^2)/pois_glm$df.res
+```
+
+Ugh. Well, how did we address this for Binomial models?
+
+\vspace{1.in}
+
+We will do the same here (revisit next week...)  Another possibility that we didn't have available to consider when we used a binomial is that different regions in the galpagos have different areas
+
+```{r}
+gala_df %>% ggplot(aes(x=Area,y=Species)) + 
+  geom_point() + theme_bw()
+
+```
+
+While this may not fix everything, before we move to a quasi-Poisson we might want to consider adding an Offset to our model. That is, instead of building a model for $\log(\mu)$ we will build a model for $\log(\frac{\mu}{A})$ where $A$ is the area of the region we are looking at. Note, this same thought process can be used if we are looking at the number of events over time and each observation took place for a different amount of time. For instance, perhaps I observed the number of crimes in one block for 2 weeks and I observed the number of crimes in another place for 3 weeks, here I would build a model for $\log(\frac{\mu}{T})$ where $T$ is time.
+
+The model becomes:
+
+\vspace{1.in}
+
+```{r}
+rate_glm <- glm(Species ~ offset(log(Area)) + Scruz + 
+                Elevation, data=gala_df,
+                family=poisson)
+
+```
+
+We can see that this doesn't really fix the issue though.

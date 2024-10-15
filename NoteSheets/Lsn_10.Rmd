@@ -1,0 +1,191 @@
+---
+title: "Lesson 10"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\url{https://www.youtube.com/watch?v=l2w3rkRM36E}
+
+\url{https://www.youtube.com/watch?v=4kpDg7MjHps}
+
+
+How is the probability of failure in a given O-ring related to the launch temperature?
+
+In the 23 previous shuttle missions for which data exists, some evidence of damage due to blow by and erosion was recorded on some O-rings. For each mission, we know the number of O-rings out of six showing some damage and the launch temperature.
+
+
+
+
+```{r, warning=FALSE,message=FALSE}
+library(faraway)
+library(tidyverse)
+
+data(orings)
+
+orings %>% glimpse()
+
+```
+
+If we let $Y_i$ be the number of defective O-rings, what is the distribution of $Y_i$?
+
+\vspace{1.5in}
+
+This is an example of grouped data. We still have a logistic regression model, but instead of looking at individual rows of success/failure, each observational unit is a group of six trials.
+
+```{r}
+
+logitmod <- glm(cbind(damage,6-damage) ~ temp, family=binomial, orings)
+plot(damage/6 ~ temp, orings, xlim=c(25,85), ylim = c(0,1), 
+     xlab="Temperature", ylab="Probability of damage")
+x <- seq(25,85,1)
+lines(x,ilogit(11.6630-0.2162*x))
+
+```
+
+As our model is grouped, we can examine goodness of fit by looking at the Deviance. Here we have:
+
+```{r}
+1-pchisq(logitmod$deviance,df.residual(logitmod))
+
+
+```
+
+Therefore, we have no evidence of lack of fit. Note though, that this doesn't tell us our model is better than any other model, only that there is no evidence that our model does not fit our data.
+
+Note that there is nothing to stop us form doing:
+
+```{r}
+erings <- with(orings, data.frame(temp=rep(temp,each=6), damage=as.vector(
+  sapply(orings$damage, function(x) rep(c(0,1), times=c(6-x,x)))
+)))
+head(erings)
+emod <- glm(damage ~ temp, family = binomial("logit"), erings)
+summary(emod)
+summary(logitmod)
+```
+
+We see that the results are the same, HOWEVER, with the ungrouped data we no longer can conduct a goodness of fit test (we would have to do a Hosmer-Lemeshow type test)
+
+An alternative to the Deviance is to compute Pearson's $\chi^2$ statistic. Which is:
+
+\vspace{1.in}
+
+This should look familiar from the analysis of categorical data you did in MA376. We note here that the degrees of freedom, typically, for a statistic of this form are the number of rows (minus 1) times the number of columns. 
+
+
+The easy way to compute this is:
+```{r}
+sum(residuals(logitmod, type = "pearson")^2)
+
+
+```
+
+or
+
+```{r}
+phat = predict(logitmod,type="response")
+n = 6
+y = orings$damage
+numerator = (y-n*phat)^2
+denominator = n*phat*(1-phat)
+sum(numerator/denominator)
+```
+
+This is just another goodness of fit test.
+
+Now, let's say we fail the test, meaning we reject our deviance test (or our Pearson's $\chi^2$ test). What could have happened?
+
+\vspace{1.5in}
+
+As we build out models we want to test the simplest thign first. The simplest thing is we don't have the right $X_i$ terms in our model. We also might have outliers, or extremely sparse data. Maybe though, we've checked (or considered) all of these and our data still doesn't fit our model well. In this case, it \textit{could} be that our data are overdispersed.
+
+Recall, for a Binomial distribution our $V(\mu)$ function was:
+
+\vspace{.5in}
+
+This means that our variance must link to mean in a set manner. Perhaps this isn't the case.
+
+Let's consider the following dataset, we have: oxes of trout eggs were buried at five different stream locations and retrieved at 4 different times. The number of surviving eggs was recorded. The box was not returned to the stream.
+
+Perhaps we build out the following model:
+
+```{r}
+bmod <- glm(cbind(survive,total-survive) ~ location + period,
+            family=binomial,troutegg)
+
+summary(bmod)
+
+```
+
+We can look at:
+
+```{r}
+1-pchisq(64.5,12)
+```
+
+Which shows evidence of lack of fit. 
+
+First thing to do is to check to ensure there's no good reason for it. Are we missing some covariates? Here we don't have anything else to consider. Are there any outliers?
+
+```{r}
+halfnorm(residuals(bmod))
+
+```
+
+Nothing obvious.
+
+Once we've done this we may consider a quasi-binomial GLM. That is, a binomial GLM with an additional dispersion parameter. First we note that our estimate of $\phi$ is:
+
+```{r}
+sum(residuals(bmod,type="pearson")^2)/12
+```
+
+The quasi-bimomial is a way for us to create a binary regression model without forcing $\phi=1$. 
+
+To do this, we need to abandon our previous way of fitting our GLMs. Recall that previously we had used the log-likelihood. Now, instead we are going to use the log \textit{quasi-likelihood}. That is, we are going to find functions that behave similar to the log-likelihodo and maximize them. We first define 
+
+\vspace{1.5in}
+
+With this, we have something that's almost a likelihood. We next define $Q_i$ as:
+
+\vspace{.5in}
+
+Then the full log quasi-likelihood is:
+
+\vspace{.5in}
+
+We will go through this more in later lessons. FOr now it suffices to know that the quasi-binomial is NOT fit via maximum likelihood estimates but it does allow us an additional free parameter that enables us to fit situations where the binomial struggles
+
+```{r}
+q_bmod <- glm(cbind(survive,total-survive) ~ location + period,
+            family=quasibinomial,troutegg)
+
+summary(q_bmod)
+
+```
+
+Note here we no longer have an AIC. Why?
+
+\vspace{.5in}
+
+
+What do we see here? Any idea why?
+```{r}
+confint(bmod)
+confint(q_bmod)
+
+prds <- predict(bmod,se.fit=TRUE)
+
+q_prds <- predict(q_bmod,se.fit=TRUE)
+
+
+prds$se.fit
+q_prds$se.fit
+```
+
+
+So, we have a trade-off here, our model is more appropriate for our data but we have less precision in our parameters. We will talk more in depth about quasi-likelihood in later classes.

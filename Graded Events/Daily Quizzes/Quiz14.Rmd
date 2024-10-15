@@ -1,0 +1,48 @@
+---
+title: "Quiz14- MA478"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Let's consider a simple linear regression model, $y_i=\beta_0+\beta_1 x_i + \epsilon_i$, where we know $\sigma^2=1$. You decide to place a $N(0,10)$ prior on $\beta_0$ and a $N(0,10)$ prior on $\beta_1$.
+
+You conduct your experiment 3 times and observe:
+
+$y_1 = 5$, $y_2=7$, and $y_3=12$ with $x_{1}=1$, $x_2=1$, and $x_3=0$.
+
+
+Below is some code for you to estimate the numerator of $p(\beta_0,\beta_1|y)$.
+
+Use this to come up with the most likely value of $\beta_0$ and $\beta_1$. How does this compare to the least squares estimates of $y$ and $x$. Change this so you now put a $N(0,100)$ prior on both $\beta$ terms and then a $N(0,1)$ prior. What happens to the estimates of $\beta$ as the standard deviation of your prior changes? Explain.
+
+
+```{r}
+
+pb = c()
+b0 = c()
+b1 = c()
+
+x = c(1,1,0)
+y = c(5,7,12)
+
+for(i in 1:1000){
+  b_0 = rnorm(1,0,10)
+  b_1 = rnorm(1,0,10)
+  pr_b1 = dnorm(b_1,0,sqrt(10))
+  pr_b0 = dnorm(b_0,0,sqrt(10))
+  lik = prod(dnorm(y,b_0+b_1*x,1))
+  pb[i] = lik*pr_b1*pr_b0
+  b0[i] = b_0
+  b1[i] = b_1
+}
+
+
+my.df <- data.frame(b0=b0,b1=b1,post_prob=pb)
+
+
+```

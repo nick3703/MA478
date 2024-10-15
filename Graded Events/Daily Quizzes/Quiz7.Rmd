@@ -1,0 +1,19 @@
+---
+title: "Quiz7 - MA478"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Once again let's consider the `wbca` dataset. Create a model to predict malignency of tumor based on marginal adhesion. Compare a model with a probit link to a logit link. Which one is preferred?
+
+\vspace{2.in}
+
+create an ROC curve for your preferred model. Determine an appropriate threshold where the sensitivity is over 60\% and the specificity is over 97\%.
+
+\vspace{1.in}
+
+Explain why the specificities are so much higher than the sensitivities for this dataset.

@@ -1,0 +1,16 @@
+---
+title: "Quiz 2"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Consider the Gamma Distribution where we know $\alpha=2$, that is:
+
+$$ f(y_i|\beta_i) = y \beta_i^2 \exp(-\beta_i y_i) \quad y_i\in (0,\infty)$$
+
+Put this in exponential dispersion family form and find $\theta_i$, $b(\theta_i)$ and $E[y_i]$

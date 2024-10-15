@@ -1,0 +1,18 @@
+---
+title: "Quiz10- MA478"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The dataset `suicide` from `library(faraway)` contains one year of suicide data from the UK cross-classified by sex age and method.
+
+\begin{itemize}
+  \item Determine if there is a relationship between the variables (i.e. are they independent of one another?)
+  \item Collapse sex and age into a single six-level factor containing all combinations of sex and age. Conduct a correspondence analysis and give an interpretation of the plot. (Different ways to do this, but  `sex:age` may be helpful)  
+
+  
+\end{itemize}

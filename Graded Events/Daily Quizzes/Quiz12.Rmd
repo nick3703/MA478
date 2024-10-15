@@ -1,0 +1,12 @@
+---
+title: "Quiz12- MA478"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+The `dvisits` dataset from `library(faraway)` comes from the Australian Health Survey of 1977-1978 and consists of 5190 single adults. Build an appropriate model to determine the relationship between `doctorco` and `sex`, `age`, `income`, and `freepoor`. Present your fitted model and explain why you choose the model you did.

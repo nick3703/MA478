@@ -1,0 +1,177 @@
+---
+title: "Lesson 17"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Last class we talked about clustered observations and said sometimes, like in Chicago, we have clustering by geographical area. Here we have multiple observations that all occur on the same cluster. We can generalize this a bit more and consider multiple forms of clustering.
+
+For example, let's consider example 9.2.3 from Agresti.  Here he discusses a study of the efficacy of two programs for discouraging young people from starting or continuing to smoke. The study compared four groups, defined by a $2 \times 2$ full factorial design according to whether a student was exposed to a school-based curriculum, and a television-based prevention program. The subjects (and this is key here) were 1600 sevent grade students from 135 classrooms in 28 Los Angeles schools. The schools were randomly assigned to the four intervention conditions. We will assume our response is normally distributed and measures tobacco and health knwoledge of an individual student. They also provide information on the pre knowledge of the student prior to getting the training.
+
+What are our observational units?
+
+
+\vspace{1.in}
+
+
+Remember our observational units are what the response is measured on. Our \textit{experimental units} are what we apply the treatment on. What are the experimental units here?
+
+\vspace{1.in}
+
+When we are in a world where our experimental units are different than our observational units, we need to account for this in someways. Let's start with our mechanism of interest, that is the fixed effects we want to observe. Here we can structure this as:
+
+\vspace{1.in}
+
+However, are there unique aspects of each school that might make the mechanism of interest manifest differently? What about each classroom? What about each student? Therefore, we can write:
+
+
+\vspace{1.5in}
+
+We can fit this as:
+
+```{r,warning=FALSE, message=FALSE}
+
+library(lme4)
+library(tidyverse)
+smoking <- read.table("https://users.stat.ufl.edu/~aa/glm/data/Smoking.dat",header=TRUE)
+
+model <- lmer(y~PTHK + SC + TV + (1|school) + (1|class), data=smoking)
+summary(model)
+
+
+```
+
+If we ignore our clustering we get:
+
+
+```{r,warning=FALSE, message=FALSE}
+
+
+model2 <- lm(y~PTHK + SC + TV, data=smoking)
+summary(model2)
+
+
+```
+
+What experiment does this model assume? While it might be tempting to want to use model 2 as the t values are bigger, this is disingenous as it assumes an experiment that we didn't actually perform. What experiment does `model2` assume conducted?
+
+
+\vspace{1.in}
+
+
+Going back to model 1. If we wanted to fit this model, we could use the likelihood from the joint distribution. To find this, let's consider the covariance between two students who not in the same school, nor the same class, in this case the covariance is:
+
+\vspace{.5in}
+
+Now consider the covariance between two students who are in the same school but not the same class:
+
+\vspace{.5in}
+
+Now two students who are in the same class:
+
+\vspace{.5in}
+
+Therefore, our entire covariance matrix looks like:
+
+
+\vspace{2.in}
+
+Once we have this we can find the MLEs maximizing:
+
+\vspace{1.in}
+
+
+Let's consider another example where we want to, perhaps, think of our random effects a little differently. Let's look at a dataset where 24 patients were randomly assigned to each of three treatment groups and compared on a measure of respiratory ability, FEV. The study observed FEV for a baseline measurement and then for each of 8 hours after a drug was administered.
+
+
+The data look like:
+
+```{r}
+
+FEV <- read.table("https://users.stat.ufl.edu/~aa/glm/data/FEV2.dat",header=TRUE)
+
+FEV %>% head()
+
+```
+
+
+What are our observational units here? What are our experimental units?
+
+\vspace{1.in}
+
+Let's write out our random effects model how we did before with a term for patient $i$ observed at hour $j$. Perhaps we have covariates for the measurement at baseline, the drug they were given, and how long the drug has been in their system.
+
+\vspace{1.in}
+
+What does this same about the covariance between patient 1 and hours 1 and 2?
+
+\vspace{.5in}
+
+What about hours 1 and 3?
+
+\vspace{.5in}
+
+For a given patient, we can write out the covariance matrix of $u_i$ as:
+
+\vspace{1.in}
+
+What are some potential issues with this?
+
+\vspace{1.in}
+
+Another, perhaps, reasonable assumption would be that the relationship between patient 1 at hours 1 and 2 is stronger than the relationship of patient 1 at hours 1 and 3. That is, we may assume that the correlation structure for $u_i$ to look like:
+
+\vspace{1.5in}
+
+This is what is called an \textit{autoregressive} correlation structure.
+
+
+```{r,warning=FALSE,message=FALSE}
+library(nlme)
+
+ar_mod <- lme(fev~base+factor(drug)+hour,
+              random=~1|patient, 
+              correlation=corAR1(form=~1|patient),
+              data=FEV,
+              method="ML")
+
+summary(ar_mod)
+
+```
+
+
+We can compare this to a model with just the random intercept
+
+
+```{r,warning=FALSE,message=FALSE}
+library(nlme)
+
+re_mod <- lme(fev~base+factor(drug)+hour,
+              random=~1|patient,
+              data=FEV,
+              method="ML")
+
+summary(re_mod)
+
+```
+
+
+Note that this model is also called a Compound Symmetry model. As we used the MLEs we can compute:
+
+```{r}
+AIC(re_mod)
+AIC(ar_mod)
+```
+
+
+Apparently you CAN compute AIC for REML \url{ https://doi.org/10.1111/anzs.12254} , it's not entirely clear to me how as I haven't dug into it, but I would hesitate to compare AIC for a model I fit with REML to AIC for a model I fit with log-likelihood.
+
+More here: \url{https://stats.stackexchange.com/questions/131272/lme4-why-is-aic-no-longer-displayed-when-using-reml}
+
+
+I want to make one more change to the syllabus (I'm sorry!) I want to cover GLMMs first before we talk about Bayesian inference. 

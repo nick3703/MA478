@@ -1,0 +1,19 @@
+---
+title: "Quiz8- MA478"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Faraway states several properties of $U_i$ on page 61. Prove:
+
+
+\begin{align*}
+E[U_i]&=0 \\
+Var[U_i] &= \frac{1}{\phi V(\mu_i)} \\
+-E[\frac{\partial U_i}{\partial \mu_i}] &= \frac{1}{\phi V(\mu_i)}
+\end{align*}

@@ -1,0 +1,13 @@
+---
+title: "Quiz5 - MA478"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In selecting explanatory variables for a linear model, what is inadequate about the strategy of selecting the model with the largest $R^2$ value?
+
+Provide two alternative strategies and tell me when you employ each of those strategies?

@@ -1,0 +1,148 @@
+---
+title: "MA478 - Lesson3"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+For a linear model with full rank $\boldsymbol{X}$ and projection matrix $\boldsymbol{P_x}$, show that $\boldsymbol{P_x}\boldsymbol{X} = \boldsymbol{X}$ and show that the column space of $\boldsymbol{X}$ is equal to the columns pace of $\boldsymbol{P_x}$.
+
+\vspace{1.in}
+
+Show that $\boldsymbol{P}y$ and $y-\boldsymbol{P}y$ are orthogonal. 
+
+\vspace{1.in}
+
+
+Multivariate Normal Distribution Review:
+
+\vspace{2.in}
+
+
+Recall that our \textit{residuals} capture the unexplained variation in our linear regression model and are calculated through $\boldsymbol{e}=\boldsymbol{y}-\boldsymbol{\hat{y}}$. Using the properties the distribution of $\boldsymbol{y}$, we know that $E[\boldsymbol{e}]$ is:
+
+\vspace{.5in}
+
+Geometrically, our residuals are orthogonal to the column space of $\boldsymbol{X}$. Further, the correlation between the residuals and $\boldsymbol{\hat{y}}$ is zero (which makes sense as $\boldsymbol{\hat{y}}$ is in the column space of $X$). This means, to examine the residuals, we should see no relationship between $\boldsymbol{e}$ and the columns of $X$ or $\boldsymbol{\hat{y}}$.
+
+We also typically assume $\boldsymbol{\epsilon}\sim MVN(\boldsymbol{0},\sigma^2 I)$, which means we should have constant variance. This can be relaxed if we make additional choices for the random component of our GLM though. However, even if we don't relax this assumption, this stipulation does NOT mean that our residuals have constant variance.
+
+While the covariance of $\boldsymbol{y}$ is clearly $\sigma^2 I$, this isn't true for covariance of $\boldsymbol{\hat{y}}$.
+
+We can compute:
+
+\vspace{1in}
+
+What this means, then, is that the covariance of our \textbf{residiual} is NOT $\sigma^2 I$. In fact, we can compute:
+
+\vspace{1.in}
+
+What this means is that our residuals are correlated and they don't necessarily have constant variance. Thus, to actually find residuals and examine their variance we should standardize them first:
+
+
+\vspace{1.in}
+
+
+So, what should we be doing?
+
+\begin{itemize}
+\item Plot standardized residuals against estimated Y
+
+\item   Plot residuals against actual Y
+
+\item   Plot fitted Y against actual Y 
+
+\end{itemize}
+
+Look for patterns (there should be none)
+
+
+```{r,warning=FALSE,message=FALSE}
+library(faraway)
+our_lm = lm(mpg~hp,data=mtcars)
+plot(mtcars$mpg,rstandard(our_lm))
+
+
+```
+
+
+How do we fix this?
+
+\vspace{1.in}
+
+Another issue with our model that residuals can help us detect are outliers. Now, we typically think about outliers as being atypical observations, but do outliers always impact our results?
+
+\vspace{.5in}
+
+Outliers tend to be an issue if they have high \textit{leverage} and they are \textit{influential}. Recall that the $var{\hat{y}_i} = \sigma^2 h_{ii}$ where $h_{ii}$ are the diagonal entires for the hat matrix. If $h_{ii}$ larger (close to 1), then $var(e)\approx 0$. Meaning, $y_i$ is highly correlated wtih $\hat{y}_i$. Therefore, the data point exactly determines where the regression like is. We say for these points the have high leverage.
+
+However, must having high leverage isn't enough to cause concern. Consider the two examples:
+
+\vspace{1.in}
+
+If we look at the first, if the high leverage point is in our dataset the slope of the line is drastically different than if the high leverage point is not in our dataset.
+
+Conversely, in the second dataset, the presence (or absence) of our high leverage point does not influence the slope of our best fit line at all.
+
+To quantify this, we compute the \textit{Cook's distance} for each of our observations
+
+
+
+```{r}
+our_lm = lm(mpg~hp,data=mtcars)
+cooks.distance(our_lm)[which.max(cooks.distance(our_lm))]
+
+
+```
+
+What's a 'big' cooks distance?  I dunno. Some people use 1 as a cut off. We can see why this point was chosen though by looking at a plot of the data.
+
+## Multicollinearity
+
+I think the last thing I want to talk about with linear regression is multicollinarity. Colliearity means that there is a correlation between any two predictors. Multicollinearity is a relationship among several predictors. Why do we think this might be a problem? 
+
+Let's consider the following. Let's say I want to determine if  weight impacts IOCT time. Consider the following two models:
+
+
+```{r}
+APFT_dat = read.csv("APFT.csv")
+
+IOCT_lm1 = lm(IOCT_Time~weight,data=APFT_dat)
+
+IOCT_lm2 = lm(IOCT_Time~height+weight,data=APFT_dat)
+
+summary(IOCT_lm1)
+summary(IOCT_lm2)
+
+```
+
+What happened?
+
+\vspace{1.in}
+
+What can we do about it?
+
+\vspace{1.in}
+
+Let me summarize this a bit. When we are fitting a linear regression model, prior to looking at any p value or conducting any statistical test, we want to make sure the model is appropriate for the data. If it's a simple linear regression model, or there are no interaction terms, we can just plot our $X$ columns vs $Y$. If there's curvature between $X$ and $Y$ then we likely have an interaction or we need to transform our $X$ column in some way (If it's appropriate for the problem).
+
+I always check the standardized residuals and plot them against both $y$ as well as $\hat{y}$. I don't usually bother checking against $X$. I typically don't worry too much about the normality of the residuals, but I do like to check for constant variance as well as checking to ensure there's no curvature. If we do not have constant variance I might consider fitting a different model such as an additive error model. I don't like transforming $y$ unless I absolutely have to.
+
+I sometimes check Cook's distance, especially if I potentially have outliers. Sometimes I forget to do this.
+
+I then, if appropriate, conduct my statistical analysis. If I'm comparing two models I'll conduct an F-test (likelihood ratio test), if my question is about the impact of a covariate I'll conduct the associated t-test. 
+
+When presenting my final model, I want to ensure I address the statistical question I started with. If my model violates some of the validity conditions, I typically address it, but unless it's a really bad violation, I usually am not too concerned. If we were conducting an analysis for a client, what types of things would we want to ensure we contain in our report? What is probably not necessary?
+
+
+## Homework
+
+
+## Quiz
+
+
+

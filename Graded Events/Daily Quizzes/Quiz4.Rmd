@@ -1,0 +1,49 @@
+---
+title: "Quiz4 - MA478"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Researchers are intersted in determining the effect of the distance to Santa Cruz island on the number of plant species found on the Galapagos Islands. They fit the following two models:
+
+```{r,warning=FALSE,message=FALSE}
+library(faraway)
+library(tidyverse)
+data(gala)
+
+gala_mod <- gala %>% select(-Endemics) #Removing Endemics
+
+
+
+Pois_glm <- glm(Species~Area+Nearest+Scruz+Elevation+I(Elevation^2),data=gala_mod,family=poisson())
+deviance(Pois_glm)
+
+
+
+Pois2_glm <- glm(Species~Area+Nearest+Elevation+I(Elevation^2),data=gala_mod,family=poisson())
+deviance(Pois2_glm)
+
+
+
+```
+
+From this output, conduct one test to answer this question by completing the following parts:
+
+\begin{itemize}
+
+\item Compute the value of a test statistic
+
+\item State the approximate null distribution of the test statistic
+
+\item Provide a p-value
+
+\item State a conclusion
+
+
+\end{itemize}
+
+

@@ -1,0 +1,12 @@
+---
+title: "Quiz 3"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Consider the Normal Distribution. Show that the Iterative Reweighted Least Squares algorithm results in the standard least squares estimates for $\beta$.

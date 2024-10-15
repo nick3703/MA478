@@ -1,0 +1,83 @@
+---
+title: "Lesson 30"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## TEE Admin
+
+\vspace{2.in}
+
+
+## Data Analysis Process
+
+
+### State a Research Question
+
+
+Why do we build out statistical models? What are our objectives? Are we purely describing patterns in observed data? Are we formulating a model for the purpose of problem conceptualization? Are we examining a scientific theory? Are we making inference about a specific quantity? Are we predicting forecasting?
+
+If prediction is our aim, we may choose to model data patterns that have no read explanation using structures we cannot interpret.
+
+## Explore the Data
+
+What do we want to know about our \textit{Random Variable}?
+
+\vspace{.5in}
+
+This might lead to a variety of different ways to explore our data. If our random variable is continuous what might we want to do?
+
+\vspace{1.5in}
+
+If our random variable is binary, would that change how we approach our exploration?
+
+\vspace{1.in}
+
+What statistics would be beneficial to calculate at this stage?
+
+\vspace{2.in}
+
+## Prepare the Data
+
+What transformations might we consider?
+
+\vspace{1.5in}
+
+What might we do with missing values?
+
+\vspace{1.5in}
+
+What else might we want to do with our data?
+
+\vspace{1.5in}
+
+
+## Build and Interpret Models
+
+Let's go through some of the models with their strengths and weaknesses. 
+
+
+
+\vspace{5.in}
+
+## Assess and Select the Best Model
+
+Let's ensure we differentiate between model assessment and model selection. Model assessment is, does our model fit the data well. What might we look at here?
+
+
+\vspace{1.5in}
+
+Model selection is, of a finite selection of models, which one will we use to represent our data. How do we go about accomplishing this?
+
+
+\vspace{2.5in}
+
+
+## Communicate the Results
+
+Who are our stakeholders? What does it mean to conduct a stakeholder analysis? What are ethical considerations we might want to address?

@@ -1,0 +1,202 @@
+---
+title: "TEE"
+author: "AJ Pimentel"
+date: "2024-05-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#set wd
+setwd("C:/Users/adrian.pimentel/OneDrive - West Point/AY24-2/MA478/TEE")
+```
+
+```{r}
+charitytrain <- read.csv('charity_train_validate.csv')
+#first look only at validating observations
+na_count <- colSums(is.na(charitytrain))
+na_count
+
+ct <- table(charitytrain$donr)
+ct
+ct2 <- table(charitytrain$donr, charitytrain$reg1, charitytrain$reg2, charitytrain$reg3, charitytrain$reg4)
+ct2
+donationset <- charitytrain[charitytrain$donr == 1, ]
+hist(donationset$incm, 
+     main = "Histogram of donation amount ", 
+     xlab = 'donation amount', 
+     ylab = "Frequency",
+     col = "skyblue", 
+     border = "black",
+       breaks = 20) 
+mean(donationset$damt)
+sd(donationset$damt)
+
+hist(donationset$incm, 
+     main = "Histogram of median income ", 
+     xlab = 'income', 
+     ylab = "Frequency",
+     col = "skyblue", 
+     border = "black",
+       breaks = 20) 
+#correlation plot
+numericcharitytrain <- charitytrain[, sapply(charitytrain, is.numeric)]
+cormat <- cor(numericcharitytrain)
+meltedcor <- melt(cormat)
+library(ggplot2)
+library(reshape2)
+
+ggplot(data = meltedcor, aes(x = Var1, y = Var2, fill = value, label = round(value, 2))) +
+  geom_tile(color = "white") +
+  geom_text(color = "white", size = 3) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", name="Correlation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, size = 12, hjust = 1)) +
+  coord_fixed()
+
+
+```
+
+
+Lets split our data into training and test, as well as transform some of the variables
+```{r}
+train <- charitytrain[charitytrain$part == "train", ]
+test <- charitytrain[charitytrain$part == "valid",]
+
+#transform variables
+train$avhv <- log(train$avhv)
+test$avhv <- log(test$avhv)
+train$incm <- log(train$incm)
+test$incm <- log(test$incm)
+train$inca <- log(train$inca)
+test$inca <- log(test$inca)
+train$npro <- log(train$npro)
+test$npro <- log(test$npro)
+train$tgif <- log(train$tgif)
+test$tgif <- log(test$tgif)
+train$lgif <- log(train$lgif)
+test$lgif <- log(test$lgif)
+train$rgif <- log(train$rgif)
+test$rgif <- log(test$rgif)
+train$agif <- log(train$agif)
+test$agif <- log(test$agif)
+
+```
+Lets start building out some models
+First we need to predict whether or not they will donate. We'll eliminate the 
+
+```{r}
+## GLM MODELING FOR CLASSIFICATION
+
+stepmodel <- step(glm(donr ~ reg1 + reg2 + reg3 + reg4 + home + chld + hinc + genf + wrat + avhv + incm + inca + plow + npro + tgif + lgif + rgif + tdon + tlag + agif, family=binomial(link='logit'), train), direction = 'backward')
+
+summary(stepmodel)
+
+full_pred <- predict(stepmodel,test, type = 'response')
+steppreds <- ifelse(full_pred>.55, 1, 0)
+stepcm <- confusionMatrix(data = as.factor(steppreds), reference = as.factor(test$donr))
+stepcm$table
+library(pROC)
+myroc <- roc(as.factor(test$donr), predict(stepmodel, test,type = 'response'))
+plot(myroc)
+myroc$auc
+
+optimal_threshold <- coords(myroc, "best", best.method = "closest.topleft")$threshold
+
+donorpredictions <- data.frame( Donorprediction = steppreds)
+test$donorpredictions <- donorpredictions$Donorprediction
+```
+Now lets take this set and try to predict the DAMT amount
+```{r}
+donortrain <- train[train$donr == 1, ]
+linmod1 <- lm(damt ~ reg1 + reg2 + reg3 + reg4 + home + chld + hinc + genf + wrat + 
+                  avhv + incm + inca + plow + npro + tgif + lgif + rgif + tdon + tlag + agif, 
+                donortrain)
+donortest <- test[test$donr == 1,]
+linmod1preds <- predict(linmod1, newdata = donortest)
+linmod1predictions <- data.frame( Mod1Preds = linmod1preds)
+donortest$mod1preds <- linmod1predictions$Mod1Preds
+mse <- mean((donortest$mod1preds - donortest$damt)^2)
+AIC(linmod1)
+mae <- mean(abs(donortest$mod1preds - donortest$damt))
+
+```
+Predict on test set
+```{r}
+actualtest <- read.csv('charity_test.csv')
+actualtest$avhv <- log(actualtest$avhv)
+actualtest$incm <- log(actualtest$incm)
+actualtest$inca <- log(actualtest$inca)
+actualtest$npro <- log(actualtest$npro)
+actualtest$tgif <- log(actualtest$tgif)
+actualtest$tgif <- log(actualtest$tgif)
+actualtest$lgif <- log(actualtest$lgif)
+actualtest$rgif <- log(actualtest$rgif)
+actualtest$agif <- log(actualtest$agif)
+
+testpreds <- predict(stepmodel,actualtest, type = 'response')
+teststeppreds <- ifelse(testpreds>.2, 1, 0)
+donortestpred <- data.frame( Donorprediction = teststeppreds)
+
+actualtest$donorpreds <- donortestpred$Donorprediction
+
+linmod1preds <- predict(linmod1, newdata = actualtest)
+linmod1predictions <- data.frame( Mod1Preds = linmod1preds)
+
+actualtest$mod1preds <- linmod1predictions$Mod1Preds
+
+ip <- data.frame(ID=actualtest$ID, damt=actualtest$mod1preds)
+ip$damt[ip$donr == 0] <- 0
+
+write.csv(ip, file = "predictions1.csv", row.names = FALSE)
+
+
+```
+
+Model 2
+```{r}
+summary(linmod1)
+linmod2 <- lm(damt ~ reg1 + reg2 + reg3 + reg4 + home + chld + hinc + genf   + incm + plow + tgif + lgif + rgif + tdon + agif, 
+                donortrain)
+linmod2preds <- predict(linmod2, newdata = donortest)
+linmod2predictions <- data.frame( Mod2Preds = linmod2preds)
+donortest$mod2preds <- linmod2predictions$Mod2Preds
+mse <- mean((donortest$mod2preds - donortest$damt)^2)
+AIC(linmod2)
+
+summary(linmod1)
+```
+model 3
+```{r}
+linmod3 <- step(lm(damt ~ reg1 + reg2 + reg3 + reg4 + home + chld + hinc + genf + wrat + avhv + incm + inca + plow + npro + tgif + lgif + rgif + tdon + tlag + agif, donortrain), direction = 'backward')
+linmod3preds <- predict(linmod3, newdata = donortest)
+linmod3predictions <- data.frame( Mod3Preds = linmod3preds)
+donortest$mod3preds <- linmod3predictions$Mod3Preds
+mse <- mean((donortest$mod3preds - donortest$damt)^2)
+
+
+summary(linmod3)
+AIC(linmod3)
+
+linmod3preds <- predict(linmod3, newdata = donortest)
+linmod3predictions <- data.frame( Mod3Preds = linmod3preds)
+donortest$mod3preds <- linmod3predictions$Mod3Preds
+mse <- mean((donortest$mod3preds - donortest$damt)^2)
+mae <- mean(abs(donortest$mod3preds - donortest$damt))
+
+anova(linmod1, linmod2, test='Chi')
+
+cooks_dist <- cooks.distance(linmod1)
+plot(cooks_dist, pch = 19, main = 'cooks distance plot', xlab = 'observation index', ylab = 'cookes distance')
+##if there are any outliers 
+
+
+# Identify observations with Cook's distance greater than 1
+outliers <- which(cooks_dist > .03)
+
+# Remove outliers from the dataframe
+clean_data <- loantrain[-outliers, ]
+```

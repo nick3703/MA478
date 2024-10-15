@@ -1,0 +1,196 @@
+---
+title: "Lesson 26"
+author: "Clark"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Note that some of the examples from today are from \url{https://m-clark.github.io/generalized-additive-models/}
+
+Sometimes it's been said that money doesn't buy happiness. Since I don't know how to meaningfully measure happiness, let's just make the (probably valid) assumption that the more you know about science the happier you will be!
+
+To analyze this data perhaps we can take some data from the Programme for International Student Assessment along a few other indexies.
+
+```{r,warning=FALSE,message=FALSE}
+
+library(tidyverse)
+library(GGally)
+library(mgcv)
+library(faraway)
+dat <- read.csv(paste0("https://raw.githubusercontent.com/m-clark/",
+          "generalized-additive-models/master/data/pisasci2006.csv"))
+
+pisa = dat %>% select(-c(Issues,Explain,Evidence,Country))
+
+pisa %>% str()
+
+```
+
+Here Overall is the average science score for 15 year olds, interest is a measure of interest in science, support for scientific inquiry, an income index, a health index, and the Human Development Index.
+
+We can explore
+
+```{r,eval=FALSE}
+
+
+# Function to return points and geom_smooth
+# allow for the method to be changed
+my_fn <- function(data, mapping, method="loess", ...){
+  p <- ggplot(data = data, mapping = mapping) + 
+    geom_point() + 
+    geom_smooth(method=method, se=FALSE)
+  p
+}
+
+pisa  %>% ggpairs(upper = list(continuous = wrap("cor", size = 3)), 
+                 lower = list(continuous =my_fn)) + theme_bw()
+
+
+```
+
+
+While we might start with a linear model, perhaps there are some concerns.
+
+```{r}
+pisa %>% ggplot(aes(x=Income,y=Overall)) +
+  geom_point() + theme_bw()
+
+```
+
+Perhaps we want a model that allows for additional flexibility inside of our linear predictor. That is:
+
+
+\vspace{1.5in}
+
+Now, this begs a lot of questions. How do we choose our $f_i()$ functions? How do we fit such a model? How do we conduct inference on this?
+
+Well, if we are given data, one criterion we may use for a linear model is a penalized sum of squares. That is, we want to find $\alpha$ and $f_i()$ terms that minimize:
+
+
+\vspace{1.5in}
+
+
+The $\lambda$ term here controls the amount of 'wiggliness' of the fitted model. If $\lambda \to \infty$ then we want our second derivative to be zero (which would result in a linear $f_i$ function, or, in other words $x\beta$). If $\lambda \to 0$ then we can fit models that perfectly interpolate our data. Typically, $\lambda$ is selected via cross-validation.
+
+In general, in can be shown, that a unique minimizer for the PRSS is an additive cubic spline model. That is, each of the functions $f_j(.)$ are cubic splines with knots at each of the unique values of $x_{ij}$. 
+
+Just as a quick example, the following basis functions would represent a cubic spline with two knots:
+
+\vspace{1.5in}
+
+Without going too far down this rabbit hole, if we don't want to select knots we could consider a cubic smoothing spline can be written as
+
+$$f(x) = \sum_{j=1}^N N_j(x) \theta_j$$
+
+Here there are knots placed on each data point. $N_j(x)$ are a set of basis functions representing the spline and $\theta_j$ gives the weights of the basis function. The $\theta$ values are shrunk similar to a ridge regression based on the value of $\lambda$ chosen.
+
+These are adjusted slightly to become natural cubic splines which are essentially regressed (with a ridge type regularization) on the data to yield an estimate of $f(x)$
+
+
+We can fit cubic splines via:
+
+```{r, warning=FALSE,message=FALSE}
+mod_gam1 = gam(Overall ~ s(Income, bs = "cr"), data = pisa)
+summary(mod_gam1)
+
+
+```
+
+
+Which we can visualize here:
+
+
+```{r}
+library(mgcViz)
+viz <- getViz(mod_gam1)
+
+viz %>% plot() + 
+   l_points(shape=19,size=2) +
+  l_fitLine(linetype = 1)  +
+  l_ciLine(linetype = 3) +
+  l_ciBar() +
+  l_rug() +
+  theme_classic()
+
+```
+
+
+
+One thing we note with the summary is we obtain p values for income. This is calculated comparing the deviance of the fitted model with the deviance of the null model after adjusting for loss of (effective) degrees of freedom. The degrees of freedom are estimated through looking at the smoothing matrix and in general a higher effective degrees of freedom means a more complex model.
+
+GAMs can be compared to other models through AIC and can be compared to nested models via anova test.
+
+More terms can be added by considering applying a cubic smoothing spline on the residuals. That is:
+
+\vspace{1in}
+
+```{r}
+mod_gam2 = gam(Overall ~ s(Income) + s(Edu) + s(Health), data = pisa)
+summary(mod_gam2)
+
+```
+
+Here we can see:
+
+
+```{r,eval=FALSE}
+viz <- getViz(mod_gam2)
+
+viz %>% plot() + 
+   l_points(shape=19,size=2) +
+  l_fitLine(linetype = 1)  +
+  l_ciLine(linetype = 3) +
+  l_ciBar() +
+  l_rug() +
+  theme_classic()
+
+```
+
+
+Looking at `Health` it looks like the spline isn't doing much, so maybe a linear fit is better.
+
+
+```{r}
+mod_gam2B = update(mod_gam2, . ~ . - s(Health) + Health)
+summary(mod_gam2B)
+
+```
+
+
+The framework from above can be extended to a generalized version of the additive model via:
+
+\vspace{1.5in}
+
+The algorithm for fitting the model is:
+
+\vspace{2.in}
+
+```{r,warning=FALSE,message=FALSE}
+
+data(ozone)
+gammgcv <- gam(O3 ~ s(temp) + s(ibh) + s(ibt), family=poisson, scale=-1, data=ozone)
+summary(gammgcv)
+
+#predict(gammgcv,type="response")
+#plot(gammgcv,residuals=TRUE,select=1)
+
+```
+
+Let's talk through this here:
+
+
+\vspace{1.5in}
+
+The `pim` dataset consists of 768 female Pima Indians. We want to predict the diabets test result from the other predictors.
+
+\begin{itemize}
+  \item Take a random sample of size 100, make this your test test.
+  \item Fit a GLM on your training set, evaluate it on your test set.
+  \item Fit a GAM on your training set, evaluate it on your test set.
+  \item Which model do you prefer?
+
+\end{itemize}

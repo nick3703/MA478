@@ -1,0 +1,366 @@
+---
+title: "Final Project Data Processing"
+author: "CDT Joshua Wong"
+date: "2024-04-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Import Libraries
+
+```{r}
+library(tidyverse)
+# for glms
+library(faraway)
+# for zip glms
+library(pscl)
+# linear mixed effects models
+library(lme4)
+library(nlme)
+```
+
+### Import Data
+
+```{r}
+# Must Set First, WD Reset for every chunk
+setwd("C:/Users/adrian.pimentel/OneDrive - West Point/AY24-2/MA478/Final Project/Data")
+all <- read.csv("alldata.csv")
+crime <- read.csv("crime .csv")
+#Population by Census Block Group
+pop <- read.csv("pop.csv")
+#Percentage Unemployed by Census Block Group
+unemp <- read.csv("unemp.csv")
+#Centered and Scaled Average Family Income by Census Block Group (2015 Dollars)
+wealth <- read.csv("wealth.csv")
+#Number of Young Males by Census Block Group (15-20 yr olds)
+ym <- read.csv("ym.csv")
+neigh <- readMM("neighborhood.mtx")
+
+pop <- pop %>% rename(pop = x)
+wealth <- wealth %>% rename(wealth = x)
+unemp <- unemp %>% rename(unemp = x)
+ym <- ym %>% rename(ym = x)
+```
+### Data Processing
+
+```{r}
+library(reshape2)
+long <- melt(all, id.vars=c("Column1", "wealth", "unemployment", "Population", "young_males"))
+colnames(long)[colnames(long) == 'value'] <- 'Burglaries'
+colnames(long)[colnames(long) == 'Column1'] <- 'Block'
+
+# Add Month and Year and date Variables
+long$year <- substr(long$variable, 7, 10)
+long$month <- substr(long$variable, 11, 13)
+long$date <- substr(long$variable, 7, 13)
+
+#impute NA year values with 5
+long$year[is.na(long$year)] <- 5
+long <- long[long$target <= 16, ]
+
+
+# Rename other census block variables
+long <- long %>% 
+  rename(pop = Population) %>% 
+  rename(unemp = unemployment) %>% 
+  rename(ym = young_males) %>% 
+  rename(target = Burglaries) %>% 
+  rename(block = Block)
+
+# Impute missing young males
+median_ym <- median(long$ym, na.rm = TRUE)
+long$ym[long$ym == 0] <- median_ym
+# Add percent Young males variable
+long$perc_ym <- long$ym / long$pop
+long$wealth <- long$wealth / long$pop
+
+# Take away uneeded col
+long <- subset(long, select = -ym)
+long <- subset(long, select = -date)
+# long <- subset(long, select = -variable)
+
+# make variables right type
+long$year <- as.integer(long$year) - 2010
+long$month <- as.factor(long$month)
+
+# scale variables
+long[, c("pop", "unemp", "perc_ym")] <- scale(long[, c("pop", "unemp", "perc_ym")])
+
+head(long)
+```
+```{r}
+crime2 <- apply(crime, 2, sum)
+
+# Sum over census blocks (see variation over month)
+crime3 <- data.frame(val=crime2)
+crime3 <- slice(crime3, -1)
+crime3$name <- row.names(crime3)
+
+# Add an index column
+crime3 <- crime3 %>% mutate(index = row_number())
+
+# Add Month and Year and date Variables
+crime3$year <- as.integer(substr(crime3$name, 7, 10))
+crime3$month <- as.integer(substr(crime3$name, 11, 13))
+
+graph1 <- ggplot(crime3, aes(x = index, y = val)) +
+  geom_point() +
+  labs(title = "Total Burglaries in Chicago Over 72 Months",
+       x = "Month (1-72)",
+       y = "Total Burglaries in Chicago")
+
+graph2 <- ggplot(crime3, aes(x = month, y = val)) +
+  geom_point() +
+  labs(title = "Total Burglaries in Chicago Per Year",
+       x = "Month (1-12)",
+       y = "Total Burglaries in Chicago")
+
+graph1
+graph2
+```
+```{r}
+# Find columns starting with "count."
+count_cols <- names(all)[startsWith(names(all), "count.")]
+
+# Sum the values across selected columns for each row
+all$sum_count <- rowSums(all[count_cols])
+
+all2 <- all[c("Column1", "sum_count", "young_males", "wealth", "unemployment", "Population")]
+all2$wealth <- all2$wealth / all2$Population
+plot1 <- all2 %>% ggplot(aes(x=young_males, y=sum_count)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+plot2 <- all2 %>% ggplot(aes(x=wealth, y=sum_count)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+plot3 <- all2 %>% ggplot(aes(x=unemployment, y=sum_count)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+plot4 <- all2 %>% ggplot(aes(x=Population, y=sum_count)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+plot1
+plot2
+plot3
+plot4
+```
+```{r}
+plot1 <- all2 %>% ggplot(aes(x=Population, y=wealth)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+plot2 <- long %>% ggplot(aes(x=pop, y=wealth)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+
+plot1
+plot2
+
+```
+
+
+### Models
+
+### Poisson GLM
+
+```{r}
+# With and Without Wealth
+pois_glm1 <- glm(target~perc_ym+pop+unemp+year+month + wealth, data=long, family=poisson)
+pois_glm2 <- glm(target~perc_ym+pop+unemp+year+month, data=long, family=poisson)
+
+
+# With and Without Population
+pois_glm3 <- glm(target~perc_ym+pop+unemp+year+month+wealth, data=long, family=poisson)
+
+pois_glm4 <- glm(target~perc_ym+unemp+year+month+wealth, data=long, family=poisson)
+
+anova(pois_glm2, pois_glm1, test="Chisq")
+
+anova(pois_glm3, pois_glm4, test="Chisq")
+summary(pois_glm2)
+```
+Note: In the poisson model, we test weather the variable wealth, or population is significant, given that they are both highly correlated and we wanted to mitigate the potential for multi-coliniearity within our data. We found that while population is significant, wealth is not.
+
+```{r}
+# this is for best pois model with population, and without wealth
+# Goodness of fit test for poisson glm 1 (our model compared to saturated)
+1-pchisq(deviance(pois_glm2), df.residual(pois_glm2))
+```
+Note: We accept the null hypothesis that the model is not a good fit for our data. Does not pass goodness of fit test.
+
+```{r}
+# Estimate phi
+deviance(pois_glm2) / df.residual(pois_glm2)
+sum(residuals(pois_glm2, type="pearson")^2)/pois_glm2$df.res
+plot(pois_glm2)
+AIC(pois_glm2)
+
+
+```
+Note: We test for over dispersion. The residuals are slightly over dispersed but not significantly so. Therefore we rule out the need for a negative binomial for count data. We then move on to a Zip GLM because of the apparent intuition for having a significant number of zeros in the response.
+
+```{r}
+# Take model and look at lambda (mean) values and simulate data with model
+# (generate data from fitted model and see if it looks like actual data)
+
+lambda.fitted <- predict(pois_glm2, type="response")
+sim_data <- rpois(nrow(long), lambda.fitted)
+
+sum(sim_data==0)
+sum(long$target==0)
+
+```
+```{r}
+summary(pois_glm2)
+```
+
+### Zip GLM ???
+
+```{r}
+# complex model
+zip_glm1 <- zeroinfl(target ~  perc_ym + pop + unemp + year + month | perc_ym + pop + unemp + year + month,
+                    data=long, 
+                    dist="poisson")
+
+
+# simpler model
+zip_glm2 <- zeroinfl(target ~  pop + unemp + year + month | perc_ym + pop + unemp + year, 
+                    data = long, 
+                    dist = "poisson")
+
+lrt1 <- logLik(zip_glm1)
+lrt2 <- logLik(zip_glm2)
+
+
+```
+```{r}
+# use difference of 12 for df to compare nested models
+# 2 * (likelihood of complex model - likelihood of simple model)
+
+1-pchisq(2 * (logLik(zip_glm1) - logLik(zip_glm2)), df = 11)
+AIC(zip_glm1)
+AIC(zip_glm2)
+```
+```{r}
+summary(zip_glm1)
+```
+
+```{r}
+AIC(pois_glm2)
+AIC(zip_glm1)
+
+# 119533.5
+```
+```{r}
+lambda.fitted <- predict(zip_glm2, type="response")
+sim_data <- rpois(nrow(long), lambda.fitted)
+
+sum(sim_data==0)
+sum(long$target==0)
+
+```
+
+### Generalized Mixed Effects Models
+
+## Linear Mixed Effects Model
+
+```{r}
+start_time <- Sys.time()
+pois_glmer1 <- glmer(target~perc_ym+pop+unemp+(1|variable), nAGQ=1, family=poisson, data=long)
+summary(pois_glmer1)
+end_time <- Sys.time()
+end_time - start_time
+```
+```{r}
+start_time <- Sys.time()
+pois_glmer2 <- glmer(target~perc_ym+pop+unemp+ (1|block), nAGQ=1, family=poisson, data=long)
+summary(pois_glmer2)
+end_time <- Sys.time()
+end_time - start_time
+```
+```{r}
+start_time <- Sys.time()
+pois_glmer3 <- glmer(target~perc_ym+pop+unemp+ year + (1|block) + (1|month), nAGQ=1, family=poisson, data=long)
+summary(pois_glmer3)
+end_time <- Sys.time()
+end_time - start_time
+AIC(pois_glmer3)
+AIC(pois_glmer1)
+```
+
+
+
+
+```{r}
+lambda.fitted <- predict(pois_glmer1, type="response")
+sim_data <- rpois(nrow(long), lambda.fitted)
+
+sum(sim_data==0)
+sum(long$target==0)
+
+lambda.fitted <- predict(pois_glmer2, type="response")
+sim_data <- rpois(nrow(long), lambda.fitted)
+
+sum(sim_data==0)
+sum(long$target==0)
+
+lambda.fitted <- predict(pois_glmer3, type="response")
+sim_data <- rpois(nrow(long), lambda.fitted)
+
+sum(sim_data==0)
+sum(long$target==0)
+```
+```{r}
+long$year[is.na(long$year)] <- 5
+plotdf <- data.frame(target = as.numeric(long$target))
+plotdf$fittedpoisson <- as.numeric(round(pois_glm2$fitted.values))#since count data
+plotdf <- plotdf[plotdf$target <= 16, ]
+
+ggplot(plotdf, aes(x = target, y = fittedpoisson)) +
+  geom_point(color = "#8e44ad", size = 3, alpha = 0.6) +  # Customize point color and size
+  geom_abline(intercept = 0, slope = 1, color = "#d7bde2", linetype = "dashed") +  # Add a reference line
+  labs(x = "Actual Values",
+       y = "Fitted Values")+
+  ggtitle('Poisson fitted vs actual values')+
+  ylim(0,10) +
+  theme_minimal()
+```
+
+```{r}
+plotdf$fittedzip <- zip_glm1$fitted.values
+plotdf$fittedzip <- round(zip_glm1$fitted.values) #since count data
+
+AIC(pois_glmer3)
+# Set axis limits
+ggplot(plotdf, aes(x = target, y = fittedzip)) +
+  geom_point(color = "#8e44ad", size = 3, alpha = 0.6) +  # Customize point color and size
+  geom_abline(intercept = 0, slope = 1, color = "#d7bde2", linetype = "dashed") +  # Add a reference line
+  labs(x = "Actual Values",
+       y = "Fitted Values") +
+  theme_minimal() +
+  ggtitle('ZIP fitted vs actual values')
+
+
+```
+```{r}
+
+plotdf$fittedglmer <- fitted(pois_glmer3)
+plotdf$fittedglmer <- round(plotdf$fittedglmer) #since count data
+# Set axis limits
+ggplot(plotdf, aes(x = target, y = fittedglmer)) +
+  geom_point(color = "#8e44ad", size = 3, alpha = 0.6) +  # Customize point color and size
+  geom_abline(intercept = 0, slope = 1, color = "#d7bde2", linetype = "dashed") +  # Add a reference line
+  labs(x = "Actual Values",
+       y = "Fitted Values") +
+  theme_minimal() +
+  ggtitle('GLMER fitted vs actual values')
+
+
+```
